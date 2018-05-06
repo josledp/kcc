@@ -65,6 +65,7 @@ class User(object):
     def get(self):
         return {'name': self.name, 'user': self.data}
 
+
 def split_config(arguments):
     with open(args.config) as fd:
         data = yaml.load(fd)
@@ -91,16 +92,59 @@ def split_config(arguments):
     for c in contexts:
         c.save()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Tool for managing multiple kubeconfig files')
-   #parser.add_argument('action', metavar='action', type=str, 
-    #                    help='action to perform (parse-default-config, add-namespace, delete-namespace, add-cluster, delete-cluster)',
-     #                   choices = ['parse-default-config', 'add-namespace', 'delete-namespace', 'add-cluster', 'delete-cluster'])
 
+def add_namespace(arguments):
+    print(arguments)
+    pass
+
+
+def del_namespace(arguments):
+    print(arguments)
+    pass
+
+
+def rename_cluster(arguments):
+    print(arguments)
+    pass
+
+
+def delete_cluster(arguments):
+    print(arguments)
+    pass
+
+
+def list_clusters(arguments):
+    print(arguments)
+    pass
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Tool for managing multiple kubeconfig files')
     subparsers = parser.add_subparsers(title="action", dest="action" )
-    pdc_parser = subparsers.add_parser("split-config")
+
+    sc_parser = subparsers.add_parser("split-config")
+    sc_parser.add_argument('--config', '-c', dest='config', type=str, help='config file to use', default='{}/.kube/config'.format(os.getenv('HOME')))
+
+
+    lc_parser = subparsers.add_parser("list-clusters")
+    lc_parser.add_argument('--full', '-f', dest='full', action='store_true', help='full listing')
+
     an_parser = subparsers.add_parser("add-namespace")
-    pdc_parser.add_argument('--config', '-c', metavar='config', type=str, help='config file to use', default='{}/.kube/config'.format(os.getenv('HOME')))
+    an_parser.add_argument('cluster', type=str, help='cluster name')
+    an_parser.add_argument('namespace', type=str, help='namespace to create')
+
+    dn_parser = subparsers.add_parser("del-namespace")
+    dn_parser.add_argument('cluster', type=str, help='cluster name')
+    dn_parser.add_argument('namespace', type=str, help='namespace to delete')
+
+    dc_parser = subparsers.add_parser("delete-cluster")
+    dc_parser.add_argument('cluster', type=str, help='cluster to delete')
+    
+    rc_parser = subparsers.add_parser("rename-cluster")
+    rc_parser.add_argument('old', type=str, help='cluster to rename')
+    rc_parser.add_argument('new', type=str, help='new cluster name')
+
     args = parser.parse_args()
 
     if args.action is None:
