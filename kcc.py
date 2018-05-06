@@ -3,12 +3,17 @@ import argparse
 import os
 import sys
 import base64
+import re
 
+from os import listdir
+from os.path import isfile, join
+
+kube_path = "{}/.kube".format(os.getenv('HOME'))
 
 class ConfigFile(object):
 
     def __init__(self, cluster_name, namespace_name):
-        self.file="{}/.kube/config|{}|{}".format(os.getenv('HOME'), cluster_name, namespace_name)
+        self.file="{}/config|{}|{}".format(kube_path, cluster_name, namespace_name)
 
     def delete(self):
         os.remove(self.file)
@@ -114,9 +119,16 @@ def delete_cluster(arguments):
 
 
 def list_clusters(arguments):
-    print(arguments)
-    pass
-
+    config_files = [f for f in listdir(kube_path) if isfile(join(kube_path, f)) and re.match('^config\|', f)]
+    last=''
+    for c in config_files:
+        data=c.split('|')
+        if arguments.full:
+            print('%50s %20s' % (data[1],data[2]))
+        else:
+            if data[1] != last:
+                print('{}'.format(data[1]))
+                last=data[1]
 
 if __name__ == "__main__":
 
@@ -124,8 +136,7 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers(title="action", dest="action" )
 
     sc_parser = subparsers.add_parser("split-config")
-    sc_parser.add_argument('--config', '-c', dest='config', type=str, help='config file to use', default='{}/.kube/config'.format(os.getenv('HOME')))
-
+    sc_parser.add_argument('--config', '-c', dest='config', type=str, help='config file to use', default='{}/config'.format(kube_path))
 
     lc_parser = subparsers.add_parser("list-clusters")
     lc_parser.add_argument('--full', '-f', dest='full', action='store_true', help='full listing')
