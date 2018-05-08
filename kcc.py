@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import yaml
 import argparse
 import os
@@ -20,7 +21,30 @@ class ConfigFile(object):
 
     def write(self, data):
         with open(self.file, 'w') as fd:
-            fd.write(yaml.dump(data))
+            fd.write(yaml.dump(data, default_flow_style=False))
+    
+    def load(self):
+        with open(self.file, 'r') as fd:
+            return yaml.load(fd)
+    
+
+    @staticmethod
+    def list(cluster=None):
+        if cluster is not None:
+            rgx = '^config\|{}\|'.format(cluster)
+        else:
+            rgx = '^config\|'
+        config_files = [f for f in listdir(kube_path) if isfile(join(kube_path, f)) and re.match(rgx, f)]
+
+        ret = {}
+        for c in config_files:
+            data = c.split('|')
+            if data[1] in ret:
+                ret[data[1]].append(data[2])
+            else:
+                ret[data[1]]=[data[2]]
+
+        return ret
 
 class Context(object):
     def __init__(self, name, cluster, user, namespace='default'):
@@ -39,18 +63,36 @@ class Context(object):
     def get(self):
         return {
             'apiVersion': 'v1',
-            'kind': 'config',
+            'kind': 'Config',
             'preferences': {},
-            'clusters': self.cluster.get(),
-            'users': self.user.get(),
-            'contexts': {
-                'context': {'cluster': self.cluster.name, 'user': self.user.name, 'namespace': self.namespace},
-                'name': self.name},
+            'clusters': [self.cluster.get()],
+            'users': [self.user.get()],
+            'contexts': [
+                {
+                
+                    'context': {'cluster': self.cluster.name, 'user': self.user.name, 'namespace': self.namespace},
+                    'name': self.name,
+                }
+            ],
             'current-context': self.name,
         }
 
     def save(self):
         self._configfile.write(self.get())
+
+    @classmethod
+    def load(cls, cluster_name, namespace='default'):
+        
+        configfile = ConfigFile(cluster_name, namespace)
+        data = configfile.load()
+        name = data['contexts'][0]['name']
+        cluster = Cluster(
+            data['clusters'][0]['name'],
+            data['clusters'][0]['cluster']['certificate-authority-data'],
+            data['clusters'][0]['cluster']['server']
+            )
+        user = User(data['users'][0]['name'], data['users'][0]['user'])
+        return cls(name, cluster, user, namespace)
 
 
 class Cluster(object):
@@ -82,7 +124,7 @@ def split_config(arguments):
     for c in data.get('clusters', []):
         if 'certificate-authority' in c['cluster']:
             with open(c['cluster']['certificate-authority']) as fd:
-                c['cluster']['certificate-authority-data'] = base64.b64encode(bytes(fd.read(),'utf-8')).decode()
+                c['cluster']['certificate-authority-data'] = base64.b64encode(bytes(fd.read())).decode()
         cluster[c['name']] = Cluster(c['name'], c['cluster']['certificate-authority-data'], c['cluster']['server'])
 
     for u in data.get('users', []):
@@ -99,36 +141,47 @@ def split_config(arguments):
 
 
 def add_namespace(arguments):
-    print(arguments)
-    pass
+    ctx = Context.load(arguments.cluster)
+    newctx = Context(ctx.name, ctx.cluster, ctx.user, arguments.namespace)
+    newctx.save()
 
 
 def del_namespace(arguments):
-    print(arguments)
-    pass
+    c = ConfigFile(arguments.cluster, arguments.namespace)
+    c.delete()
 
 
 def rename_cluster(arguments):
-    print(arguments)
-    pass
+    l = ConfigFile.list(arguments.old)
+    for n in l[arguments.old]:
+        ctx = Context.load(arguments.old, n)
+        ctx.cluster.name = arguments.new
+        ctx.name = arguments.new
+        newctx = Context(ctx.name, ctx.cluster, ctx.user, n)
+        newctx.save()
+        ctx.delete()
 
 
 def delete_cluster(arguments):
-    print(arguments)
+    l = ConfigFile.list(arguments.cluster)
+    for n in l[arguments.cluster]:
+        c = ConfigFile(arguments.cluster, n)
+        c.delete()
     pass
 
 
 def list_clusters(arguments):
-    config_files = [f for f in listdir(kube_path) if isfile(join(kube_path, f)) and re.match('^config\|', f)]
-    last=''
-    for c in config_files:
-        data=c.split('|')
+    cluster_list = ConfigFile.list()
+
+    max_length = len(max(cluster_list.keys(), key=len))+3
+    line = '%-{}s %-20s'.format(max_length)
+
+    for c in cluster_list.keys():
         if arguments.full:
-            print('%50s %20s' % (data[1],data[2]))
+            for n in cluster_list[c]:
+                print(line % (c, n))
         else:
-            if data[1] != last:
-                print('{}'.format(data[1]))
-                last=data[1]
+                print(c)
 
 if __name__ == "__main__":
 
