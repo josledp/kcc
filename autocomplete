@@ -1,0 +1,33 @@
+_kcs() {
+  if [ $COMP_CWORD -eq 2 ]; then
+    _complete_kns ${COMP_WORDS[1]} ${COMP_WORDS[2]}
+    return
+  elif [ $COMP_CWORD -gt 2 ]; then
+    COMPREPLY=()
+    return
+  fi
+  local CLUSTERS="`ls -1 ~/.kube/config\#*|cut -f2 -d\#|tr '\n' ' '`"
+  COMPREPLY=($(compgen -W "$CLUSTERS" "${COMP_WORDS[1]}"))
+}
+
+_kns() {
+  if [ -z "$K8SCLUSTER" ]; then
+    COMPREPLY=()
+    return
+  fi
+  if [ $COMP_CWORD -gt 1 ]; then
+    COMPREPLY=()
+    return
+  fi
+  _complete_kns "$K8SCLUSTER" "${COMP_WORDS[1]}"
+}
+
+_complete_kns() {
+  local CLUSTER="$1"
+  local NAMESPACE="$2"
+  local NAMESPACES="`ls -1 ~/.kube/config\#${CLUSTER}\#*|cut -f3 -d\#|tr '\n' ' '`"
+  COMPREPLY=($(compgen -W "$NAMESPACES" "${NAMESPACE}"))
+}
+
+complete -F _kcs kcs
+complete -F _kns kns
